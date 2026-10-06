@@ -1,8 +1,8 @@
 name: probe
 on:
   schedule:
-    - cron: '*/5 * * * *'   # health + landing
-    - cron: '3,33 * * * *'  # health?deep=1
+    - cron: '2-57/5 * * * *'   # health + landing
+    - cron: '4,34 * * * *'  # health?deep=1
   workflow_dispatch:
     inputs:
       mode:
@@ -20,7 +20,7 @@ jobs:
         id: probe
         run: |
           mode=shallow
-          if [ "${{ github.event.schedule }}" = "3,33 * * * *" ] || [ "${{ github.event.inputs.mode }}" = "deep" ]; then mode=deep; fi
+          if [ "${{ github.event.schedule }}" = "4,34 * * * *" ] || [ "${{ github.event.inputs.mode }}" = "deep" ]; then mode=deep; fi
           ./probe.sh "$mode" | tee "$RUNNER_TEMP/out.csv"
       - name: Commit to data branch
         run: |
