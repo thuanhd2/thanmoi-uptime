@@ -1,0 +1,38 @@
+name: probe
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # health + landing
+    - cron: '3,33 * * * *'  # health?deep=1
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: shallow | deep
+        default: shallow
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe
+        id: probe
+        run: |
+          mode=shallow
+          if [ "${{ github.event.schedule }}" = "3,33 * * * *" ] || [ "${{ github.event.inputs.mode }}" = "deep" ]; then mode=deep; fi
+          ./probe.sh "$mode" | tee "$RUNNER_TEMP/out.csv"
+      - name: Commit to data branch
+        run: |
+          git fetch origin data || true
+          git config user.name "uptime-bot"; git config user.email "uptime-bot@users.noreply.github.com"
+          f="data/$(date -u +%Y-%m).csv"
+          for i in 1 2 3 4 5; do
+            git fetch origin data 2>/dev/null && git checkout -q -B data origin/data || { git checkout -q --orphan data; git rm -rqf . >/dev/null 2>&1 || true; }
+            mkdir -p data
+            [ -f "$f" ] || echo "ts_utc,target,http,ms,status,attempts" > "$f"
+            cat "$RUNNER_TEMP/out.csv" >> "$f"
+            git add data && git commit -qm "probe $(date -u +%FT%TZ)" && git push origin data && exit 0
+            sleep $((RANDOM % 5 + 2))
+          done
+          exit 1
