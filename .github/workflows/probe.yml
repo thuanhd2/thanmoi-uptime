@@ -1,8 +1,5 @@
 name: probe
 on:
-  schedule:
-    - cron: '2-57/5 * * * *'   # health + landing
-    - cron: '4,34 * * * *'  # health?deep=1
   workflow_dispatch:
     inputs:
       mode:
