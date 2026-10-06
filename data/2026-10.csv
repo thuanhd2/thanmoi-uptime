@@ -5,3 +5,4 @@ ts_utc,target,http,ms,status,attempts
 2026-10-06T11:48:53Z,landing,200,1415,up,1
 2026-10-06T11:48:58Z,health,200,856,up,1
 2026-10-06T11:48:58Z,landing,200,582,up,1
+2026-10-06T11:49:04Z,health_deep,200,1999,up,1
