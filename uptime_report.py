@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Báo cáo uptime từ CSV probe (ts_utc,target,http,ms,status,attempts).
 
-Mỗi mục tiêu chia thành các ô 5 phút. Ô có mẫu 'down' => down; có mẫu và không down => up;
+Mỗi mục tiêu chia thành các ô 5 phút (30 phút cho *_deep). Ô có mẫu 'down' => down; có mẫu và không down => up;
 không có mẫu => không rõ (KHÔNG tính là up). uptime% = up/(up+down); coverage% = (up+down)/tổng ô.
 Nhiều nguồn: nguồn đứng trước thắng; nguồn sau chỉ lấp ô nguồn trước không rõ.
 
@@ -11,6 +11,10 @@ import argparse, csv, glob, os, sys
 from datetime import datetime, timedelta, timezone
 
 SLOT = 300
+DEEP_SLOT = 1800  # target *_deep chạy 30 phút/lần
+
+def slot_of(tgt):
+    return DEEP_SLOT if tgt.endswith("_deep") else SLOT
 
 def load(paths):
     rows = []
@@ -56,8 +60,8 @@ def main():
     for i, src in enumerate(sources):
         tmp = {}
         for t, tgt, up in src:
-            s = int(t.timestamp()) // SLOT
-            if s0 <= s < s1:
+            s = int(t.timestamp()) // slot_of(tgt)
+            if int(start.timestamp()) // slot_of(tgt) <= s < int(end.timestamp()) // slot_of(tgt):
                 k = (tgt, s)
                 tmp[k] = tmp.get(k, True) and up
         for (tgt, s), up in tmp.items():
@@ -77,8 +81,9 @@ def main():
         d = per.get(tgt, {})
         # từng ngày + tổng tháng
         days, months = {}, {}
-        for s in range(s0, s1):
-            dt = datetime.fromtimestamp(s * SLOT, timezone.utc).astimezone(tz)
+        sl = slot_of(tgt)
+        for s in range(int(start.timestamp()) // sl, int(end.timestamp()) // sl):
+            dt = datetime.fromtimestamp(s * sl, timezone.utc).astimezone(tz)
             st = d.get(s)
             for bucket, key in ((days, dt.strftime("%Y-%m-%d")), (months, dt.strftime("%Y-%m"))):
                 c = bucket.setdefault(key, [0, 0, 0])
