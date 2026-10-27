@@ -1,5 +1,5 @@
 // Giám sát hành trình khách trả phí (THA-3746): landing -> CTA -> /app/draft -> editor tải -> nút xuất bản
-// -> cửa đăng nhập -> điều kiện thanh toán. KHÔNG đăng nhập, KHÔNG tạo đơn/thiệp, KHÔNG ghi DB production.
+// -> cửa đăng nhập -> điều kiện thanh toán; thêm /tro-giup và /blog phải có bài (THA-6858). KHÔNG đăng nhập, KHÔNG tạo đơn/thiệp, KHÔNG ghi DB production.
 // Dùng:  node journey.mjs            (in JSON kết quả; exit 0 = đạt, 1 = hỏng)
 // Env:   LANDING_URL (mặc định https://thanmoi.vn)  APP_URL (mặc định https://app.thanmoi.vn)
 //        PROD_APP_ORIGIN (origin mà CTA phải trỏ tới, mặc định https://app.thanmoi.vn)
@@ -31,6 +31,18 @@ async function stepLanding() {
   const ids = [...new Set([...html.matchAll(re)].map((m) => m[1]))]
   check(ids.length >= MIN_TEMPLATES, `landing chỉ có ${ids.length} nút CTA /app/new?template=… (cần ≥ ${MIN_TEMPLATES}) — CTA gãy hoặc đổi trỏ`)
   return ids
+}
+
+// THA-6858: landing tĩnh dựng lúc API lỗi thì /tro-giup (hoặc /blog) rỗng mà vẫn HTTP 200.
+async function stepContentPages() {
+  const lists = [['/tro-giup', 'Chưa có bài trợ giúp', 'trợ giúp'], ['/blog', 'Chưa có bài viết', 'blog']]
+  for (const [path, emptyText, label] of lists) {
+    const r = await get(`${LANDING}${path}`)
+    check(r.status === 200, `landing ${path} HTTP ${r.status}`)
+    const html = await r.text()
+    const links = new Set([...html.matchAll(new RegExp(`href="${path}/([a-z0-9-]+)"`, 'g'))].map((m) => m[1]))
+    check(!html.includes(emptyText) && links.size >= 1, `landing ${path} RỖNG (${links.size} bài ${label}${html.includes(emptyText) ? `, hiện "${emptyText}"` : ''}) — dựng lại landing (RUNBOOK §13.4)`)
+  }
 }
 
 async function stepCtaRedirects(ids) {
@@ -145,6 +157,7 @@ async function runOnce(browser) {
   let ok = true
   try {
     const ids = await step('landing', stepLanding)
+    await step('content_pages', stepContentPages)
     await step('cta_redirect', () => stepCtaRedirects(ids))
     const id = process.env.JOURNEY_TEMPLATE ?? ids[Math.floor(Date.now() / 3600000) % ids.length]
     const ed = await step(`editor(${id})`, () => stepEditor(browser, id))

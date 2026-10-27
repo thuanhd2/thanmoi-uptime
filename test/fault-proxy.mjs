@@ -1,6 +1,6 @@
 // Proxy LOCAL chuyển tiếp tới production (chỉ GET/HEAD + webhook POST không khoá) và cố ý làm hỏng MỘT bước,
 // để kiểm monitor có báo đỏ. Không sửa gì trên production. Dùng: FAULT=<tên> node test/fault-proxy.mjs
-// FAULT: none | cta | cta_redirect | editor_js | editor_blank | publish | google | pricing | webhook
+// FAULT: none | help_empty | cta | cta_redirect | editor_js | editor_blank | publish | google | pricing | webhook
 // In ra 2 dòng env: LANDING_URL=… APP_URL=… rồi chạy tiếp tới khi bị kill.
 import http from 'node:http'
 
@@ -16,6 +16,7 @@ function serve(upstream, port, selfOrigin, rewrites) {
         res.writeHead(405).end()
         return
       }
+      if (FAULT === 'help_empty' && u.pathname.replace(/\/$/, '') === '/tro-giup') return res.writeHead(200, { 'content-type': 'text/html' }).end('<p class="empty">Chưa có bài trợ giúp</p>')
       if (FAULT === 'cta_redirect' && u.pathname === '/app/new') return res.writeHead(404).end('fault')
       if (FAULT === 'editor_js' && /^\/_next\/static\/chunks\/.*\.js$/.test(u.pathname) && /(app|main|page)/.test(u.pathname)) return res.writeHead(500).end('fault')
       if (FAULT === 'google' && u.pathname === '/api/auth/google') return res.writeHead(500).end('fault')
