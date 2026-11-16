@@ -23,13 +23,19 @@ function check(cond, msg) {
   if (!cond) throw new Error(msg)
 }
 
+// Từ PR #266 (release-1.1.75) thẻ mẫu chỉ còn link /mau/<id> (data-pop); nút CTA /app/new nằm trong popup, trang /mau/<id> chỉ có CTA của mẫu đó.
 async function stepLanding() {
   const r = await get(`${LANDING}/thiep-tat-nien`)
   check(r.status === 200, `landing /thiep-tat-nien HTTP ${r.status}`)
   const html = await r.text()
-  const re = new RegExp(`href="${PROD_APP.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/app/new\\?template=([a-z]\\d{2})"`, 'g')
-  const ids = [...new Set([...html.matchAll(re)].map((m) => m[1]))]
-  check(ids.length >= MIN_TEMPLATES, `landing chỉ có ${ids.length} nút CTA /app/new?template=… (cần ≥ ${MIN_TEMPLATES}) — CTA gãy hoặc đổi trỏ`)
+  const ids = [...new Set([...html.matchAll(/data-pop="([a-z]\d{2})"/g)].map((m) => m[1]))]
+  check(ids.length >= MIN_TEMPLATES, `landing chỉ có ${ids.length} thẻ mẫu data-pop (cần ≥ ${MIN_TEMPLATES}) — thẻ mẫu gãy hoặc đổi giao diện (sửa journey.mjs cùng PR)`)
+  const cta = new RegExp(`href="${PROD_APP.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/app/new\\?template=([a-z]\\d{2})"`)
+  const id = process.env.JOURNEY_TEMPLATE ?? ids[Math.floor(Date.now() / 3600000) % ids.length]
+  const pr = await get(`${LANDING}/mau/${id}`)
+  check(pr.status === 200, `landing /mau/${id} HTTP ${pr.status}`)
+  const m = (await pr.text()).match(cta)
+  check(m && m[1] === id, `trang /mau/${id} không có nút CTA ${PROD_APP}/app/new?template=${id} — CTA gãy hoặc đổi trỏ`)
   return ids
 }
 

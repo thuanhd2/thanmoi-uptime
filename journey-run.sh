@@ -11,8 +11,15 @@ OUT="${JOURNEY_LOG_DIR:-/Users/thuanho/projects/thanmoi/thanmoi-org/agents/engin
 mkdir -p "$OUT"; f="$OUT/journey-$(date -u +%Y-%m).csv"
 [ -f "$f" ] || echo "ts_utc,ok,ms,attempts,failed_step,error" > "$f"
 cd "$DIR" || exit 1
-res="$(perl -e 'alarm 170; exec @ARGV' node journey.mjs 2>/dev/null)"
-[ -n "$res" ] || res='{"ok":false,"ms":0,"attempts":0,"steps":[{"name":"runner","ok":false,"error":"journey.mjs không chạy xong trong 170s hoặc không có kết quả"}]}'
+# Chromium để trong repo (.browsers): ~/Library/Caches/ms-playwright từng bị xoá => journey.mjs chết ngay, 8-16/11 báo đỏ nhầm (THA-10038). Cài lại: PLAYWRIGHT_BROWSERS_PATH=$PWD/.browsers node node_modules/playwright-core/cli.js install chromium-headless-shell
+export PLAYWRIGHT_BROWSERS_PATH="$DIR/.browsers"
+errf="$(mktemp)"
+res="$(perl -e 'alarm 170; exec @ARGV' node journey.mjs 2>"$errf")"
+if [ -z "$res" ]; then
+  why="$(grep -m1 -E 'Error|Executable' "$errf" | tr -d '"\\' | cut -c1-160)"
+  res="{\"ok\":false,\"ms\":0,\"attempts\":0,\"steps\":[{\"name\":\"runner\",\"ok\":false,\"error\":\"journey.mjs không có kết quả (quá 170s hoặc chết): ${why:-không có thông báo lỗi}\"}]}"
+fi
+rm -f "$errf"
 line="$(printf '%s' "$res" | python3 -c '
 import sys,json,datetime
 d=json.load(sys.stdin);bad=[s for s in d["steps"] if not s["ok"]]

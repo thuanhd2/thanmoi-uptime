@@ -11,7 +11,7 @@ Monitor ngoài VPS cho KR10 (uptime ≥ 99,5%). Repo công khai CHỈ để GitH
 
 ## Hành trình khách trả phí (THA-3746)
 `journey.mjs` (Playwright-core + Chromium headless, viewport 390px) chạy MỖI GIỜ (:07, launchd `vn.thanmoi.journey` → `journey-run.sh`):
-1. `https://thanmoi.vn/thiep-tat-nien` 200 và ≥10 nút CTA `https://app.thanmoi.vn/app/new?template=<id>`; mọi CTA chuyển (3xx) tới `/app/draft?template=<id>`.
+1. `https://thanmoi.vn/thiep-tat-nien` 200 và ≥10 thẻ mẫu `data-pop="<id>"` (từ PR #266; trước đó là nút CTA); trang `/mau/<id>` của mẫu được chọn có CTA `https://app.thanmoi.vn/app/new?template=<id>`; mọi `/app/new?template=<id>` chuyển (3xx) tới `/app/draft?template=<id>`.
 2. Mở `/app/draft?template=<id>` (mẫu xoay theo giờ) trong trình duyệt: HTTP 200, ≥3 JS `/_next/static/` đều <400, không `pageerror`/`console.error`, hiện bảng chỉnh sửa + khung xem trước thiệp có chữ.
 3. Tab "Xuất bản" → "Đăng nhập để xuất bản" → cửa đăng nhập có "Tiếp tục với Google" (`/api/auth/google` 302 tới accounts.google.com), `/app/login`, `/app/register` 200.
 4. `/api/public/pricing` có bảng giá hợp lệ (wedding, yearend); webhook SePay `POST` không khoá trả 401 (route sống).
@@ -19,3 +19,7 @@ Hỏng thì thử lại 1 lần sau 45s; hỏng cả hai → ping `<heartbeat>/f
 Không ghi gì lên production: không đăng nhập, không tạo đơn/thiệp; chặn host ngoài (Pixel/analytics) và `/api/funnel`; UA chứa `ThanMoiUptimeMonitor` để bộ lọc bot loại khỏi số khách.
 **Giới hạn:** KHÔNG kiểm bước tạo đơn/QR thật (cần đăng nhập + ghi `orders` production; không có môi trường staging an toàn) — chỉ kiểm tới trước tạo đơn + bảng giá + webhook sống. Không bắt lỗi chỉ xảy ra sau đăng nhập (lưu thiệp, tải ảnh, nhạc, `adopt`), lỗi riêng thiết bị/trình duyệt khác, lỗi lúc tải cao. Chỉ chạy từ 1 Mac ở VN (không kiểm theo vùng). Một mẫu/giờ đi hết editor; 15 mẫu còn lại chỉ kiểm CTA→draft.
 Thử lỗi cục bộ: `FAULT=cta|cta_redirect|editor_js|editor_blank|publish|google|pricing|webhook node test/fault-proxy.mjs` rồi chạy `journey.mjs` với `LANDING_URL=http://127.0.0.1:3901 APP_URL=http://127.0.0.1:3902 PROD_APP_ORIGIN=http://127.0.0.1:3902`.
+
+## Chromium + bẫy đổi giao diện (THA-10038)
+- Chromium nằm ở `.browsers/` (gitignored; `journey-run.sh` đặt `PLAYWRIGHT_BROWSERS_PATH`). Mất thì cài lại: `PLAYWRIGHT_BROWSERS_PATH=$PWD/.browsers node node_modules/playwright-core/cli.js install chromium-headless-shell`. Cache mặc định `~/Library/Caches/ms-playwright` đã từng biến mất ⇒ node chết ngay, dòng log `runner` báo đỏ nhầm (8–16/11/2026).
+- Dòng `runner` trong CSV nay kèm dòng lỗi đầu của node. Đổi giao diện landing (thẻ mẫu, CTA) phải sửa `stepLanding` trong cùng PR.
